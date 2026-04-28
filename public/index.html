@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>RATO Marketing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="manifest" href="/manifest.json">
+
+<style>
+body{font-family:Arial;margin:0;background:#f1f5f9}
+.wrap{padding:20px}
+.card{background:white;padding:20px;border-radius:15px;margin-bottom:15px}
+input{width:100%;padding:10px;margin:5px 0}
+button{padding:10px;background:#22c55e;color:white;border:0;border-radius:8px}
+</style>
+</head>
+
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+let token="";
+
+function showLogin(){
+app.innerHTML=`
+<div class="card">
+<h2>Login</h2>
+<input id="email" placeholder="Email">
+<input id="pass" type="password" placeholder="Password">
+<button onclick="login()">Login</button>
+<button onclick="showRegister()">Register</button>
+</div>`;
+}
+
+function showRegister(){
+app.innerHTML=`
+<div class="card">
+<h2>Register</h2>
+<input id="name" placeholder="Name">
+<input id="email" placeholder="Email">
+<input id="phone" placeholder="Phone">
+<input id="pass" type="password" placeholder="Password">
+<label>ID Document</label>
+<input type="file" id="id">
+<label>CV</label>
+<input type="file" id="cv">
+<label>Bank Letter</label>
+<input type="file" id="bank">
+<button onclick="register()">Submit</button>
+</div>`;
+}
+
+async function register(){
+let f=new FormData();
+f.append("name",name.value);
+f.append("email",email.value);
+f.append("phone",phone.value);
+f.append("password",pass.value);
+f.append("idDocument",id.files[0]);
+f.append("cvDocument",cv.files[0]);
+f.append("bankLetter",bank.files[0]);
+
+let r=await fetch("/api/register",{method:"POST",body:f});
+let d=await r.json();
+alert(d.message);
+showLogin();
+}
+
+async function login(){
+let r=await fetch("/api/login",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({email:email.value,password:pass.value})
+});
+let d=await r.json();
+token=d.token;
+loadCampaigns();
+}
+
+async function loadCampaigns(){
+let r=await fetch("/api/campaigns",{headers:{Authorization:"Bearer "+token}});
+let data=await r.json();
+
+app.innerHTML=data.map(c=>`
+<div class="card">
+<h3>${c.brand}</h3>
+<p>${c.store}</p>
+<p>R${c.rate}</p>
+<button onclick="apply(${c.id})">Apply</button>
+<button onclick="clock(${c.id})">Clock</button>
+</div>`).join("");
+}
+
+async function apply(id){
+await fetch("/api/apply",{
+method:"POST",
+headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+body:JSON.stringify({campaignId:id})
+});
+alert("Applied");
+}
+
+async function clock(id){
+navigator.geolocation.getCurrentPosition(async pos=>{
+let f=new FormData();
+f.append("campaignId",id);
+f.append("type","Clock In");
+f.append("lat",pos.coords.latitude);
+f.append("lng",pos.coords.longitude);
+
+let input=document.createElement("input");
+input.type="file";
+input.onchange=async ()=>{
+f.append("photo",input.files[0]);
+
+await fetch("/api/clock",{method:"POST",headers:{Authorization:"Bearer "+token},body:f});
+alert("Clocked ✔️");
+};
+input.click();
+});
+}
+
+showLogin();
+</script>
+</body>
+</html>
